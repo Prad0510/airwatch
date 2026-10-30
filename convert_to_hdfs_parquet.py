@@ -137,5 +137,13 @@ def convert_and_partition(
     print(f"Partitioned Parquet size: {total_size / (1024 * 1024):.2f} MB")
     print(f"Original CSV size: {os.path.getsize(input_csv) / (1024 * 1024):.2f} MB")
 
+    # 8. Auto-export dashboard data for the AirWatch Web UI
+    try:
+        from export_dashboard_data import export_with_duckdb
+        print("[Dashboard] Generating updated dashboard_data.json for UI...")
+        export_with_duckdb(output_dir, "inspection_report.json", "dashboard_data.json")
+    except Exception as e:
+        print(f"[Dashboard] Note: Could not auto-export dashboard data: {e}")
+
 if __name__ == "__main__":
     convert_and_partition()

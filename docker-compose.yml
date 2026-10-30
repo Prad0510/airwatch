@@ -75,6 +75,25 @@ services:
     volumes:
       - ./:/workspace
 
+  # ----------------------------------------------------
+  # AirWatch Web Dashboard & Live Analytics Server
+  # Web UI: http://localhost:8050
+  # ----------------------------------------------------
+  dashboard:
+    image: python:3.10-slim
+    container_name: airwatch-dashboard
+    restart: unless-stopped
+    ports:
+      - "8050:8050"
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace
+    command: >
+      bash -c "pip install duckdb pandas pyarrow && python serve_dashboard.py --no-browser --port 8050"
+    depends_on:
+      - namenode
+      - spark-master
+
 volumes:
   hadoop_namenode:
   hadoop_datanode:

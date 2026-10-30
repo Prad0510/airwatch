@@ -1,0 +1,959 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>AirWatch: Indian air quality dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Public+Sans:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    <style>
+        :root {
+            --bg: #EDF0F2;
+            --surface: #FFFFFF;
+            --ink: #13232E;
+            --muted: #5B6B77;
+            --line: #D5DCE1;
+            --accent: #1D7A8C;
+            --soft: #E3EAEE;
+            box-sizing: border-box;
+            padding-top: env(safe-area-inset-top, 0px);
+            padding-bottom: env(safe-area-inset-bottom, 0px)
+        }
+
+        @media (prefers-color-scheme:dark) {
+            :root:not([data-theme="light"]) {
+                --bg: #0E171D;
+                --surface: #16232B;
+                --ink: #E6EEF2;
+                --muted: #93A5B1;
+                --line: #27373F;
+                --accent: #4FB3C6;
+                --soft: #1D2D36
+            }
+        }
+
+        :root[data-theme="dark"] {
+            --bg: #0E171D;
+            --surface: #16232B;
+            --ink: #E6EEF2;
+            --muted: #93A5B1;
+            --line: #27373F;
+            --accent: #4FB3C6;
+            --soft: #1D2D36
+        }
+
+        html {
+            scroll-padding-top: env(safe-area-inset-top, 0px)
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box
+        }
+
+        [hidden] {
+            display: none !important
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--ink);
+            font: 400 15px/1.5 "Public Sans", system-ui, sans-serif
+        }
+
+        :fullscreen body {
+            font-size: 17px
+        }
+
+        :fullscreen .wrap {
+            max-width: 1320px
+        }
+
+        h1,
+        h2,
+        .big {
+            font-family: "Bricolage Grotesque", "Public Sans", system-ui, sans-serif;
+            margin: 0
+        }
+
+        .wrap {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 24px 20px 44px
+        }
+
+        header {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 14px
+        }
+
+        h1 {
+            font-size: 34px;
+            font-weight: 700;
+            letter-spacing: -.02em
+        }
+
+        header p {
+            margin: 4px 0 0;
+            color: var(--muted);
+            max-width: 60ch
+        }
+
+        .acts {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center
+        }
+
+        .btn {
+            border: 1px solid var(--line);
+            background: var(--surface);
+            color: var(--ink);
+            padding: 9px 14px;
+            border-radius: 8px;
+            font: 500 14px "Public Sans", sans-serif;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: border-color 0.15s, background 0.15s
+        }
+
+        .btn:hover {
+            border-color: var(--accent)
+        }
+
+        .btn.pri {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff
+        }
+
+        .btn:focus-visible,
+        .tabs button:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--line);
+            margin-bottom: 16px;
+            overflow-x: auto
+        }
+
+        .tabs button {
+            background: none;
+            border: 0;
+            border-bottom: 3px solid transparent;
+            color: var(--muted);
+            padding: 10px 16px;
+            font: 600 15px "Public Sans", sans-serif;
+            cursor: pointer;
+            white-space: nowrap
+        }
+
+        .tabs button[aria-selected="true"] {
+            color: var(--ink);
+            border-color: var(--accent)
+        }
+
+        #status {
+            margin: 0 0 16px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            background: var(--soft);
+            color: var(--muted);
+            font-size: 13.5px
+        }
+
+        #status.ok {
+            color: var(--ink);
+            border-left: 4px solid #2E9E5B
+        }
+
+        #status.err {
+            color: var(--ink);
+            border-left: 4px solid #D9482F
+        }
+
+        .hero {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            padding: 28px
+        }
+
+        .hero .big {
+            font-size: clamp(26px, 4.4vw, 46px);
+            line-height: 1.1;
+            font-weight: 700;
+            letter-spacing: -.02em;
+            max-width: 22ch
+        }
+
+        .hero .sub {
+            color: var(--muted);
+            margin: 8px 0 22px
+        }
+
+        #strip {
+            display: flex;
+            height: 60px;
+            border-radius: 10px;
+            overflow: hidden;
+            gap: 2px
+        }
+
+        #strip div {
+            min-width: 2px
+        }
+
+        #legend {
+            list-style: none;
+            margin: 16px 0 0;
+            padding: 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px 16px
+        }
+
+        #legend li {
+            display: grid;
+            grid-template-columns: 12px 1fr;
+            column-gap: 8px;
+            font-size: 13px
+        }
+
+        #legend i {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            margin-top: 4px
+        }
+
+        #legend span {
+            grid-column: 2;
+            color: var(--muted)
+        }
+
+        .kpis {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 12px;
+            margin: 14px 0 16px
+        }
+
+        .kpi {
+            padding: 14px 16px;
+            border-left: 3px solid var(--accent);
+            background: var(--surface);
+            border-radius: 4px 10px 10px 4px
+        }
+
+        .kpi b {
+            display: block;
+            font: 700 26px "Bricolage Grotesque", sans-serif
+        }
+
+        .kpi span {
+            color: var(--muted);
+            font-size: 13px
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 16px
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 20px;
+            min-width: 0
+        }
+
+        .c7 {
+            grid-column: span 7
+        }
+
+        .c5 {
+            grid-column: span 5
+        }
+
+        .c6 {
+            grid-column: span 6
+        }
+
+        .c12 {
+            grid-column: span 12
+        }
+
+        @media(max-width:860px) {
+
+            .c7,
+            .c5,
+            .c6 {
+                grid-column: span 12
+            }
+
+            .wrap {
+                padding: 18px 14px 40px
+            }
+        }
+
+        .card h2 {
+            font-size: 19px;
+            font-weight: 700
+        }
+
+        .card .q {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 2px 0 14px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap
+        }
+
+        .tag {
+            font-size: 11.5px;
+            font-weight: 600;
+            padding: 1px 8px;
+            border-radius: 99px;
+            background: #F2C230;
+            color: #3a2e00
+        }
+
+        .tag.live {
+            background: #2E9E5B;
+            color: #fff
+        }
+
+        .chart {
+            position: relative;
+            height: 320px
+        }
+
+        .scroll {
+            overflow-x: auto
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13.5px
+        }
+
+        th {
+            font-weight: 600;
+            color: var(--muted);
+            text-align: right;
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--line);
+            white-space: nowrap
+        }
+
+        td {
+            padding: 8px;
+            border-bottom: 1px solid var(--line);
+            text-align: right;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums
+        }
+
+        th:first-child,
+        td:first-child,
+        th.l,
+        td.l {
+            text-align: left
+        }
+
+        tr:last-child td {
+            border-bottom: 0
+        }
+
+        .bar {
+            display: inline-block;
+            height: 8px;
+            border-radius: 4px;
+            vertical-align: middle;
+            margin-right: 8px
+        }
+
+        .dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px
+        }
+
+        .take {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            display: grid;
+            gap: 12px
+        }
+
+        .take li {
+            padding-left: 14px;
+            border-left: 3px solid var(--accent);
+            font-size: 15px
+        }
+
+        .take b {
+            font-weight: 600
+        }
+
+        .heat {
+            display: grid;
+            grid-template-columns: 44px repeat(12, 1fr);
+            gap: 3px;
+            font-size: 12px;
+            min-width: 560px
+        }
+
+        .heat .h {
+            color: var(--muted);
+            text-align: center;
+            align-self: center
+        }
+
+        .heat .y {
+            color: var(--muted);
+            align-self: center
+        }
+
+        .heat .c {
+            height: 34px;
+            border-radius: 5px;
+            display: grid;
+            place-items: center;
+            color: #10202a;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums
+        }
+
+        .flow {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 14px
+        }
+
+        .flow li,
+        .fact {
+            padding: 12px 14px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--bg)
+        }
+
+        .flow li b,
+        .fact b {
+            display: block;
+            font-size: 14px
+        }
+
+        .flow li span,
+        .fact span {
+            font-size: 13px;
+            color: var(--muted)
+        }
+
+        .flow li:last-child {
+            border-color: var(--accent)
+        }
+
+        .facts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px
+        }
+
+        .fact b {
+            font: 700 24px "Bricolage Grotesque", sans-serif;
+            color: var(--accent)
+        }
+
+        .vs {
+            display: grid;
+            gap: 10px;
+            margin-top: 6px
+        }
+
+        .vs div {
+            display: grid;
+            grid-template-columns: 150px 1fr 56px;
+            gap: 10px;
+            align-items: center;
+            font-size: 13.5px
+        }
+
+        .vs i {
+            display: block;
+            height: 22px;
+            border-radius: 5px
+        }
+
+        .cluster-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 12px;
+            margin-top: 8px
+        }
+
+        .cluster-node {
+            border: 1px solid var(--line);
+            background: var(--bg);
+            padding: 14px;
+            border-radius: 8px
+        }
+
+        .cluster-node .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            margin-right: 6px
+        }
+
+        .cluster-node .status-dot.online {
+            background: #2E9E5B
+        }
+
+        .cluster-node .status-dot.offline {
+            background: #D9482F
+        }
+
+        .cluster-node .status-dot.local {
+            background: #F2C230
+        }
+
+        footer {
+            margin-top: 20px;
+            color: var(--muted);
+            font-size: 12.5px
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <header>
+            <div>
+                <h1>AirWatch</h1>
+                <p id="subtitle"></p>
+            </div>
+            <div class="acts">
+                <input id="file" type="file" accept=".json,application/json" hidden>
+                <button class="btn" id="loadBtn">Load dashboard_data.json</button>
+                <button class="btn" id="syncBtn" title="Re-query curated Parquet / HDFS backend">Sync Backend</button>
+                <button class="btn pri" id="present">Present</button>
+            </div>
+        </header>
+        <nav class="tabs" role="tablist" aria-label="Dashboard sections">
+            <button role="tab" data-t="overview">Overview</button>
+            <button role="tab" data-t="where">Where it’s worst</button>
+            <button role="tab" data-t="when">When it’s worst</button>
+            <button role="tab" data-t="bigdata">Big data pipeline</button>
+        </nav>
+        <p id="status"></p>
+        <div data-tab="overview">
+            <section class="hero">
+                <p class="big" id="headline"></p>
+                <p class="sub">Every hourly reading in the dataset, split by CPCB AQI category. Bar widths show each
+                    category’s share.</p>
+                <div id="strip" role="img" aria-label="Stacked bar of AQI categories"></div>
+                <ul id="legend"></ul>
+            </section>
+            <div class="kpis" id="kpis"></div>
+            <div class="grid">
+                <section class="card c5">
+                    <h2>Key takeaways</h2>
+                    <p class="q">Written from the data on this page <span class="tag">Sample</span></p>
+                    <ul class="take" id="take"></ul>
+                </section>
+                <section class="card c7">
+                    <h2>What each PM2.5 class contains</h2>
+                    <p class="q">Query 4: other pollutants within each CPCB class <span class="tag">Sample</span></p>
+                    <div class="scroll">
+                        <table id="classTable"></table>
+                    </div>
+                </section>
+            </div>
+        </div>
+        <div class="grid" data-tab="where" hidden>
+            <section class="card c5">
+                <h2>Average PM2.5 by city</h2>
+                <p class="q">Query 1: ten worst cities <span class="tag">Sample</span></p>
+                <div class="chart" style="height:380px"><canvas id="cityChart"></canvas></div>
+            </section>
+            <section class="card c7">
+                <h2>Most polluted stations</h2>
+                <p class="q">Query 2: highest mean PM2.5, with hours rated Severe <span class="tag">Sample</span></p>
+                <div class="scroll">
+                    <table id="stationTable"></table>
+                </div>
+            </section>
+        </div>
+        <div class="grid" data-tab="when" hidden>
+            <section class="card c12">
+                <h2>Month by month, every year</h2>
+                <p class="q">Average PM2.5 in µg/m³, coloured by CPCB class. Winter spikes show up as the orange and red
+                    columns. <span class="tag">Sample</span></p>
+                <div class="scroll">
+                    <div class="heat" id="heat"></div>
+                </div>
+            </section>
+            <section class="card c7">
+                <h2>Yearly curves</h2>
+                <p class="q">Click a year in the legend to hide it <span class="tag">Sample</span></p>
+                <div class="chart"><canvas id="monthChart"></canvas></div>
+            </section>
+            <section class="card c5">
+                <h2>Hour of the day</h2>
+                <p class="q">Average PM2.5 by hour across all stations <span class="tag">Sample</span></p>
+                <div class="chart"><canvas id="hourChart"></canvas></div>
+            </section>
+        </div>
+        <div data-tab="bigdata" hidden>
+            <div class="grid">
+                <section class="card c12">
+                    <h2>How the data flows</h2>
+                    <p class="q">From a 209.5 MB CSV to this dashboard</p>
+                    <ol class="flow">
+                        <li><b>Raw CSV</b><span>station_hour.csv, 2.59M rows</span></li>
+                        <li><b>HDFS landing</b><span>/data/air_quality/raw</span></li>
+                        <li><b>Clean and classify</b><span>Remove duplicates, turn negatives into nulls, add CPCB
+                                classes, join city</span></li>
+                        <li><b>Parquet</b><span>Snappy, partitioned by year and month</span></li>
+                        <li><b>Query</b><span>Spark SQL, Hive, DuckDB, MapReduce</span></li>
+                        <li><b>This dashboard</b><span>Reads dashboard_data.json / Live Backend API</span></li>
+                    </ol>
+                </section>
+                <section class="card c12">
+                    <h2>Design decisions</h2>
+                    <p class="q">What the pipeline does and why</p>
+                    <div class="facts">
+                        <div class="fact"><b>67</b><span>year and month partitions. Partitioning by station (110) or by
+                                day would create thousands of tiny HDFS files.</span></div>
+                        <div class="fact"><b>Columnar</b><span>Parquet reads only the columns a query needs, such as
+                                PM2.5 and AQI, instead of all 16.</span></div>
+                        <div class="fact"><b>3 engines</b><span>The same Parquet table is queried with Spark SQL, Hive
+                                external tables and DuckDB.</span></div>
+                        <div class="fact"><b>MapReduce</b><span>Hadoop Streaming mapper and reducer compute mean, min
+                                and max PM2.5 per station.</span></div>
+                    </div>
+                </section>
+                <section class="card c12">
+                    <h2>Live backend & HDFS cluster status</h2>
+                    <p class="q">Real-time state of the big data storage layer and query engines</p>
+                    <div class="cluster-grid" id="clusterStatus">
+                        <div class="cluster-node"><span class="status-dot local"></span><b>Storage Layer</b><br><span
+                                id="storageInfo">Partitioned Parquet (Snappy), 67 Partitions</span></div>
+                        <div class="cluster-node"><span class="status-dot" id="hdfsDot"></span><b>Hadoop
+                                NameNode</b><br><span id="hdfsInfo">Checking hdfs://namenode:9000...</span></div>
+                        <div class="cluster-node"><span class="status-dot" id="sparkDot"></span><b>Apache Spark
+                                Master</b><br><span id="sparkInfo">Checking spark-master:8085...</span></div>
+                        <div class="cluster-node"><span class="status-dot online"></span><b>Query Engine</b><br><span
+                                id="engineInfo">DuckDB (Local) & Spark SQL (Distributed)</span></div>
+                    </div>
+                </section>
+                <section class="card c6">
+                    <h2>Query speed</h2>
+                    <p class="q">Filtering to 2020, from the README benchmark. Relative time, lower is better.</p>
+                    <div class="vs">
+                        <div>Raw CSV<i style="background:#D9482F;width:100%"></i><b>25.6×</b></div>
+                        <div>Partitioned Parquet<i style="background:#2E9E5B;width:3.9%;min-width:6px"></i><b>1×</b>
+                        </div>
+                    </div>
+                    <p class="q" style="margin-top:14px">Partition pruning skips every folder except year=2020, and
+                        column pruning skips the other columns.</p>
+                </section>
+                <section class="card c6">
+                    <h2>How complete is the data?</h2>
+                    <p class="q">Share of readings with no value, from inspect_dataset.py</p>
+                    <div class="chart"><canvas id="missChart"></canvas></div>
+                </section>
+            </div>
+        </div>
+        <footer>Data: Indian Air Quality dataset (station_hour.csv, Kaggle). Categories follow CPCB breakpoints. Use the
+            left and right arrow keys to move between sections.</footer>
+    </div>
+    <script>
+        const NF = new Intl.NumberFormat('en-IN');
+        const BUCKETS = [['Good', '#2E9E5B'], ['Satisfactory', '#9BC53D'], ['Moderate', '#F2C230'], ['Poor', '#EF8A2A'], ['Very Poor', '#D9482F'], ['Severe', '#8E1B2E'], ['No AQI', '#9AA7B0']];
+        const COLOR = Object.fromEntries(BUCKETS);
+        const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const TABS = ['overview', 'where', 'when', 'bigdata'];
+        // Real figures come from inspection_report.json. Query results are sample values
+        // until a dashboard_data.json made by export_dashboard_data.py is loaded.
+        const SEASON = [95, 80, 62, 58, 56, 44, 32, 30, 38, 70, 108, 104], YF = { 2015: 1.12, 2016: 1.06, 2017: 1.0, 2018: .96, 2019: .94, 2020: .86 };
+        const DATA = {
+            sample: true, live: false,
+            meta: { rows: 2589083, stations: 110, start: '2015-01-01', end: '2020-07-01', days: 2009, csvMb: 209.5 },
+            buckets: { 'Good': 152113, 'Satisfactory': 530164, 'Moderate': 675008, 'Poor': 239990, 'Very Poor': 301150, 'Severe': 120468, 'No AQI': 570190 },
+            missing: { 'Xylene': 80.15, 'NH3': 47.76, 'PM10': 43.23, 'Toluene': 40.26, 'Benzene': 33.28, 'SO2': 28.69, 'O3': 28.04, 'PM2.5': 25.02, 'AQI': 22.02, 'NO': 21.39, 'NO2': 20.43, 'CO': 19.28, 'NOx': 18.96 },
+            cities: [
+                { city: 'Delhi', stations: 38, pm25: 117.3, pm10: 232.1, aqi: 259 }, { city: 'Patna', stations: 5, pm25: 99.8, pm10: 179.0, aqi: 214 },
+                { city: 'Gurugram', stations: 4, pm25: 95.1, pm10: 190.4, aqi: 202 }, { city: 'Lucknow', stations: 3, pm25: 92.4, pm10: 170.2, aqi: 201 },
+                { city: 'Kolkata', stations: 7, pm25: 69.9, pm10: 105.3, aqi: 150 }, { city: 'Ahmedabad', stations: 6, pm25: 62.2, pm10: 115.0, aqi: 190 },
+                { city: 'Mumbai', stations: 10, pm25: 41.5, pm10: 95.1, aqi: 100 }, { city: 'Hyderabad', stations: 6, pm25: 40.2, pm10: 82.0, aqi: 98 },
+                { city: 'Chennai', stations: 5, pm25: 37.8, pm10: 80.3, aqi: 90 }, { city: 'Bengaluru', stations: 9, pm25: 33.1, pm10: 68.4, aqi: 80 }],
+            stations: [
+                { id: 'DL002', name: 'Anand Vihar', city: 'Delhi', mean: 128.4, max: 985.0, severe: 5120 }, { id: 'DL018', name: 'Jahangirpuri', city: 'Delhi', mean: 124.9, max: 942.5, severe: 4870 },
+                { id: 'DL031', name: 'Wazirpur', city: 'Delhi', mean: 119.6, max: 910.2, severe: 4310 }, { id: 'DL008', name: 'R K Puram', city: 'Delhi', mean: 112.7, max: 870.0, severe: 3790 },
+                { id: 'BR005', name: 'IGSC Planetarium Complex', city: 'Patna', mean: 104.2, max: 820.6, severe: 3105 }, { id: 'UP014', name: 'Talkatora District School', city: 'Lucknow', mean: 98.8, max: 790.3, severe: 2640 },
+                { id: 'HR012', name: 'Sector-51', city: 'Gurugram', mean: 96.5, max: 760.1, severe: 2412 }, { id: 'WB010', name: 'Victoria', city: 'Kolkata', mean: 74.3, max: 604.8, severe: 1180 },
+                { id: 'GJ001', name: 'Maninagar', city: 'Ahmedabad', mean: 66.0, max: 548.2, severe: 905 }, { id: 'MH005', name: 'Powai', city: 'Mumbai', mean: 45.1, max: 322.7, severe: 210 }],
+            heat: Object.fromEntries(Object.entries(YF).map(([y, f]) => [y, SEASON.map((v, m) => (+y === 2020 && m > 5) ? null : +(v * f).toFixed(1))])),
+            hourly: [62, 58, 55, 53, 54, 60, 72, 88, 98, 92, 80, 70, 62, 58, 56, 58, 66, 80, 98, 112, 118, 108, 90, 74],
+            classes: [
+                { cls: 'Good', readings: 442118, pm25: 21.4, pm10: 58.2, no2: 15.3, co: 0.48 }, { cls: 'Satisfactory', readings: 601204, pm25: 46.0, pm10: 98.1, no2: 22.6, co: 0.62 },
+                { cls: 'Moderate', readings: 414360, pm25: 74.8, pm10: 142.5, no2: 33.0, co: 0.79 }, { cls: 'Poor', readings: 138012, pm25: 105.2, pm10: 187.9, no2: 41.7, co: 1.02 },
+                { cls: 'Very Poor', readings: 247380, pm25: 168.9, pm10: 278.3, no2: 52.4, co: 1.45 }, { cls: 'Severe', readings: 98320, pm25: 312.6, pm10: 447.0, no2: 63.8, co: 2.31 }]
+        };
+        const $ = s => document.querySelector(s);
+        const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+        const charts = {};
+        const mk = (id, cfg) => { charts[id]?.destroy(); charts[id] = new Chart($('#' + id), cfg); };
+        const pmClass = v => { for (const [l, n] of [[30, 'Good'], [60, 'Satisfactory'], [90, 'Moderate'], [120, 'Poor'], [250, 'Very Poor']]) if (v <= l) return n; return 'Severe'; };
+        const fmtMonth = d => new Date(d).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+        const axes = () => ({ line: css('--line'), muted: css('--muted'), ink: css('--ink') });
+        function setStatus() {
+            const el = $('#status');
+            if (DATA.live && !DATA.sample) {
+                const src = DATA.data_source || 'Parquet / HDFS';
+                const ts = DATA.generated_at ? ' (' + new Date(DATA.generated_at).toLocaleTimeString() + ')' : '';
+                el.className = 'ok';
+                el.textContent = `Showing live results from your ${src} dataset${ts}.`;
+            }
+            else {
+                el.className = '';
+                el.textContent = 'Totals, the AQI strip and the completeness chart use real figures from your inspection report. Charts tagged Sample show placeholder values until you load dashboard_data.json (made by export_dashboard_data.py).';
+            }
+            document.querySelectorAll('.tag').forEach(t => t.hidden = !DATA.sample);
+        }
+        function hero() {
+            const b = DATA.buckets, total = Object.values(b).reduce((a, c) => a + c, 0), m = DATA.meta;
+            const bad = (b['Poor'] || 0) + (b['Very Poor'] || 0) + (b['Severe'] || 0);
+            $('#headline').textContent = `${(bad / (total - (b['No AQI'] || 0)) * 100).toFixed(1)}% of readings with an AQI were Poor or worse`;
+            $('#strip').innerHTML = BUCKETS.map(([n, c]) => `<div title="${n}: ${NF.format(b[n] || 0)}" style="flex:${b[n] || 0};background:${c}"></div>`).join('');
+            $('#legend').innerHTML = BUCKETS.map(([n, c]) => `<li><i style="background:${c}"></i><b>${n}</b><span>${NF.format(b[n] || 0)} (${((b[n] || 0) / total * 100).toFixed(1)}%)</span></li>`).join('');
+            const k = [[NF.format(m.rows), 'hourly records'], [m.stations, 'monitoring stations'], [NF.format(m.days), 'calendar days covered'], [(m.csvMb || 209.5) + ' MB', 'raw CSV size'], ['25.6×', 'faster queries on partitioned Parquet']];
+            $('#kpis').innerHTML = k.map(([v, l]) => `<div class="kpi"><b>${v}</b><span>${l}</span></div>`).join('');
+            $('#classTable').innerHTML = `<thead><tr><th class="l">Class</th><th>Readings</th><th>PM2.5 / PM10</th><th>NO2</th><th>CO</th></tr></thead><tbody>` +
+                DATA.classes.map(x => `<tr><td class="l"><span class="dot" style="background:${COLOR[x.cls]}"></span>${x.cls}</td><td>${NF.format(x.readings)}</td><td>${(x.ratio ?? (x.pm10 ? x.pm25 / x.pm10 : 0)).toFixed(2)}</td><td>${x.no2}</td><td>${x.co}</td></tr>`).join('') + '</tbody>';
+            const avg = a => { const v = a.filter(x => x != null); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 0; };
+            const mAvg = MONTHS.map((_, i) => avg(Object.values(DATA.heat).map(r => r[i])));
+            const top = DATA.cities[0] || { city: 'Delhi', pm25: 110.8 }, pm = mAvg.indexOf(Math.max(...mAvg)), lo = mAvg.indexOf(Math.min(...mAvg));
+            const hr = DATA.hourly.indexOf(Math.max(...DATA.hourly)), miss = Object.entries(DATA.missing).sort((a, b) => b[1] - a[1])[0] || ['Xylene', 80.15];
+            $('#take').innerHTML = [
+                `<b>${top.city}</b> has the highest average PM2.5 at ${top.pm25} µg/m³, about ${(top.pm25 / 60).toFixed(1)} times the CPCB Satisfactory limit of 60.`,
+                `<b>${MONTHS[pm]}</b> is the most polluted month on average (${mAvg[pm].toFixed(0)} µg/m³). <b>${MONTHS[lo]}</b> is the cleanest (${mAvg[lo].toFixed(0)}).`,
+                `Pollution peaks around <b>${String(hr).padStart(2, '0')}:00</b> each day, at ${DATA.hourly[hr]} µg/m³.`,
+                `<b>${miss[0].replace('PM2_5', 'PM2.5')}</b> is missing in ${miss[1]}% of readings, so analyses on it use only the rows that have it.`].map(t => `<li>${t}</li>`).join('');
+        }
+        function cityChart() {
+            const c = DATA.cities, a = axes();
+            mk('cityChart', {
+                type: 'bar',
+                data: { labels: c.map(x => x.city), datasets: [{ data: c.map(x => x.pm25), backgroundColor: c.map(x => COLOR[pmClass(x.pm25)]), borderRadius: 4 }] },
+                options: {
+                    indexAxis: 'y', maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { callbacks: { label: i => `PM2.5 ${i.parsed.x}`, afterLabel: i => { const r = c[i.dataIndex]; return `PM10 ${r.pm10}, AQI ${r.aqi}, ${r.stations} stations`; } } } },
+                    scales: { x: { grid: { color: a.line }, ticks: { color: a.muted }, title: { display: true, text: 'µg/m³', color: a.muted } }, y: { grid: { display: false }, ticks: { color: a.ink } } }
+                }
+            });
+            const s = DATA.stations, top = Math.max(...s.map(x => x.mean), 1);
+            $('#stationTable').innerHTML = `<thead><tr><th class="l">Station</th><th>Mean PM2.5</th><th>Max PM2.5</th><th>Severe hours</th></tr></thead><tbody>` +
+                s.map(x => `<tr><td class="l"><b>${x.name}</b><br><span style="color:var(--muted);font-size:12.5px">${x.city}, ${x.id}</span></td><td><span class="bar" style="width:${Math.round(x.mean / top * 70)}px;background:${COLOR[pmClass(x.mean)]}"></span>${x.mean}</td><td>${x.max}</td><td>${NF.format(x.severe)}</td></tr>`).join('') + '</tbody>';
+        }
+        function whenCharts() {
+            const a = axes(), ys = Object.keys(DATA.heat), ramp = ['#B7C4CE', '#9FB3C2', '#8AA0B3', '#4C9AAB', css('--accent'), '#D9482F'];
+            $('#heat').innerHTML = '<div></div>' + MONTHS.map(m => `<div class="h">${m}</div>`).join('') +
+                ys.map(y => `<div class="y">${y}</div>` + DATA.heat[y].map(v => v == null ? '<div class="c" style="background:var(--soft)"></div>' : `<div class="c" style="background:${COLOR[pmClass(v)]}" title="${y} ${v}">${Math.round(v)}</div>`).join('')).join('');
+            mk('monthChart', {
+                type: 'line',
+                data: { labels: MONTHS, datasets: ys.map((y, i) => ({ label: y, data: DATA.heat[y], borderColor: ramp[Math.min(i + ramp.length - ys.length, ramp.length - 1)] || ramp[i % 6], backgroundColor: 'transparent', tension: .3, pointRadius: 2, borderWidth: i === ys.length - 1 ? 3 : 2 })) },
+                options: {
+                    maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { color: a.muted, usePointStyle: true } } },
+                    scales: { x: { grid: { display: false }, ticks: { color: a.muted } }, y: { grid: { color: a.line }, ticks: { color: a.muted }, title: { display: true, text: 'PM2.5 µg/m³', color: a.muted } } }
+                }
+            });
+            mk('hourChart', {
+                type: 'line',
+                data: { labels: DATA.hourly.map((_, h) => String(h).padStart(2, '0')), datasets: [{ data: DATA.hourly, borderColor: css('--accent'), backgroundColor: css('--accent') + '33', fill: true, tension: .35, pointRadius: 0, borderWidth: 2.5 }] },
+                options: {
+                    maintainAspectRatio: false, plugins: { legend: { display: false } },
+                    scales: { x: { grid: { display: false }, ticks: { color: a.muted, maxTicksLimit: 8 }, title: { display: true, text: 'Hour of day', color: a.muted } }, y: { grid: { color: a.line }, ticks: { color: a.muted } } }
+                }
+            });
+        }
+        function missChart() {
+            const e = Object.entries(DATA.missing).map(([k, v]) => [k.replace('PM2_5', 'PM2.5'), v]).sort((a, b) => b[1] - a[1]), a = axes();
+            mk('missChart', {
+                type: 'bar',
+                data: { labels: e.map(x => x[0]), datasets: [{ data: e.map(x => x[1]), backgroundColor: e.map(x => x[1] > 40 ? '#D9482F' : x[1] > 25 ? '#EF8A2A' : css('--accent')), borderRadius: 4 }] },
+                options: {
+                    indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: i => `${i.parsed.x}% missing` } } },
+                    scales: { x: { max: 100, grid: { color: a.line }, ticks: { color: a.muted, callback: v => v + '%' } }, y: { grid: { display: false }, ticks: { color: a.ink } } }
+                }
+            });
+        }
+        let cur = 'overview';
+        function draw() {
+            setStatus();
+            const m = DATA.meta;
+            $('#subtitle').textContent = `Hourly air quality from ${m.stations} monitoring stations across India, ${fmtMonth(m.start)} to ${fmtMonth(m.end)}.`;
+            if (!window.Chart && cur !== 'overview') { $('#status').textContent = 'Charts could not load. Check your internet connection and reload.'; return; }
+            if (window.Chart) { Chart.defaults.font.family = '"Public Sans", system-ui, sans-serif'; Chart.defaults.color = css('--muted'); }
+            if (cur === 'overview') hero();
+            else if (cur === 'where') cityChart();
+            else if (cur === 'when') whenCharts();
+            else missChart();
+        }
+        function show(t) {
+            cur = t;
+            document.querySelectorAll('[data-tab]').forEach(s => s.hidden = s.dataset.tab !== t);
+            document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.t === t));
+            draw(); scrollTo(0, 0);
+            if (t === 'bigdata') checkClusterStatus();
+        }
+        function applyJson(j) {
+            if (j.meta) Object.assign(DATA.meta, j.meta);
+            if (j.monthly && !j.heat) j.heat = j.monthly;
+            ['buckets', 'missing', 'cities', 'stations', 'heat', 'hourly', 'classes'].forEach(k => { if (j[k] && (Array.isArray(j[k]) ? j[k].length : Object.keys(j[k]).length)) DATA[k] = j[k]; });
+            if (j.data_source) DATA.data_source = j.data_source;
+            if (j.generated_at) DATA.generated_at = j.generated_at;
+            DATA.sample = !(j.cities && j.stations && j.heat && j.classes && j.hourly);
+            DATA.live = true;
+            draw();
+        }
+        async function loadFile(f) {
+            try { applyJson(JSON.parse(await f.text())); }
+            catch (e) { const el = $('#status'); el.className = 'err'; el.textContent = 'That file could not be read. Load the dashboard_data.json written by export_dashboard_data.py.'; }
+        }
+        async function checkClusterStatus() {
+            try {
+                const res = await fetch('/api/hdfs-status');
+                if (!res.ok) throw new Error('API offline');
+                const info = await res.json();
+                const hdfsDot = $('#hdfsDot'), hdfsInfo = $('#hdfsInfo');
+                const sparkDot = $('#sparkDot'), sparkInfo = $('#sparkInfo');
+                const storageInfo = $('#storageInfo');
+
+                if (info.hdfs_connected) {
+                    hdfsDot.className = 'status-dot online';
+                    hdfsInfo.textContent = `Online (IPC: ${info.hdfs_url || 'hdfs://namenode:9000'})`;
+                } else {
+                    hdfsDot.className = 'status-dot local';
+                    hdfsInfo.textContent = `Offline (Using local Parquet tables)`;
+                }
+
+                if (info.spark_connected) {
+                    sparkDot.className = 'status-dot online';
+                    sparkInfo.textContent = `Spark Master active (Web: ${info.spark_master_web || 'localhost:8085'})`;
+                } else {
+                    sparkDot.className = 'status-dot local';
+                    sparkInfo.textContent = `Spark Master offline (Local DuckDB engine active)`;
+                }
+
+                if (info.local_parquet && info.local_parquet.exists) {
+                    storageInfo.textContent = `Partitioned Parquet (${info.local_parquet.partitions} partitions, ${info.local_parquet.total_size_mb} MB)`;
+                }
+            } catch (e) {
+                $('#hdfsDot').className = 'status-dot local';
+                $('#hdfsInfo').textContent = 'Stand-alone mode (Local Parquet dataset)';
+                $('#sparkDot').className = 'status-dot local';
+                $('#sparkInfo').textContent = 'DuckDB high-speed SQL executor';
+            }
+        }
+        async function syncBackendData() {
+            const el = $('#status');
+            el.className = '';
+            el.textContent = 'Contacting backend: Re-aggregating Parquet & HDFS air quality data...';
+            try {
+                const res = await fetch('/api/refresh', { method: 'POST' });
+                if (res.ok) {
+                    const j = await res.json();
+                    applyJson(j);
+                    el.className = 'ok';
+                    el.textContent = `Synchronized successfully with backend dataset at ${new Date().toLocaleTimeString()}.`;
+                    return;
+                }
+            } catch (_) { }
+
+            // Fallback to fetching dashboard_data.json
+            try {
+                const res = await fetch('dashboard_data.json?t=' + Date.now());
+                if (res.ok) {
+                    const j = await res.json();
+                    applyJson(j);
+                    el.className = 'ok';
+                    el.textContent = `Reloaded fresh dashboard_data.json at ${new Date().toLocaleTimeString()}.`;
+                } else {
+                    throw new Error('dashboard_data.json not found');
+                }
+            } catch (err) {
+                el.className = 'err';
+                el.textContent = 'Backend server not responding. Run: python serve_dashboard.py';
+            }
+        }
+        document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => show(b.dataset.t)));
+        $('#loadBtn').addEventListener('click', () => $('#file').click());
+        $('#syncBtn').addEventListener('click', syncBackendData);
+        $('#file').addEventListener('change', e => e.target.files[0] && loadFile(e.target.files[0]));
+        $('#present').addEventListener('click', () => { document.documentElement.requestFullscreen?.().catch(() => { }); show('overview'); });
+        addEventListener('keydown', e => {
+            if (e.target.closest?.('input')) return;
+            const i = TABS.indexOf(cur);
+            if (e.key === 'ArrowRight') show(TABS[Math.min(i + 1, 3)]);
+            if (e.key === 'ArrowLeft') show(TABS[Math.max(i - 1, 0)]);
+        });
+        addEventListener('dragover', e => e.preventDefault());
+        addEventListener('drop', e => { e.preventDefault(); e.dataTransfer.files[0] && loadFile(e.dataTransfer.files[0]); });
+        matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+        show('overview');
+
+        // Auto-fetch data on initial load
+        (async () => {
+            try {
+                const res = await fetch('/api/dashboard-data');
+                if (res.ok) {
+                    const j = await res.json();
+                    applyJson(j);
+                    return;
+                }
+            } catch (_) { }
+
+            fetch('dashboard_data.json')
+                .then(r => r.ok ? r.json() : null)
+                .then(j => j && applyJson(j))
+                .catch(() => { });
+        })();
+    </script>
+</body>
+
+</html>

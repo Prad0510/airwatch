@@ -1,0 +1,360 @@
+{
+  "sample": false,
+  "live": true,
+  "generated_at": "2026-10-30T18:33:48.970791+00:00",
+  "data_source": "Partitioned Parquet (Snappy)",
+  "meta": {
+    "rows": 2589083,
+    "stations": 110,
+    "start": "2015-01-01",
+    "end": "2020-07-01",
+    "days": 2009,
+    "csvMb": 209.5
+  },
+  "buckets": {
+    "Good": 152113,
+    "Satisfactory": 530164,
+    "Moderate": 675008,
+    "Poor": 239990,
+    "Very Poor": 301150,
+    "Severe": 120468,
+    "No AQI": 570190
+  },
+  "missing": {
+    "Xylene": 80.15,
+    "NH3": 47.76,
+    "PM10": 43.23,
+    "Toluene": 40.26,
+    "Benzene": 33.28,
+    "SO2": 28.69,
+    "O3": 28.04,
+    "PM2.5": 25.02,
+    "AQI": 22.02,
+    "NO": 21.39,
+    "NO2": 20.43,
+    "CO": 19.28,
+    "NOx": 18.96
+  },
+  "cities": [
+    {
+      "city": "Delhi",
+      "stations": 38,
+      "pm25": 110.8,
+      "pm10": 216.6,
+      "aqi": 239.0
+    },
+    {
+      "city": "Lucknow",
+      "stations": 5,
+      "pm25": 109.6,
+      "pm10": 0.0,
+      "aqi": 217.0
+    },
+    {
+      "city": "Gurugram",
+      "stations": 4,
+      "pm25": 104.9,
+      "pm10": 172.0,
+      "aqi": 211.0
+    },
+    {
+      "city": "Patna",
+      "stations": 6,
+      "pm25": 103.9,
+      "pm10": 121.2,
+      "aqi": 213.0
+    },
+    {
+      "city": "Ahmedabad",
+      "stations": 1,
+      "pm25": 67.3,
+      "pm10": 111.5,
+      "aqi": 454.0
+    },
+    {
+      "city": "Brajrajnagar",
+      "stations": 1,
+      "pm25": 66.4,
+      "pm10": 125.4,
+      "aqi": 151.0
+    },
+    {
+      "city": "Jorapokhar",
+      "stations": 1,
+      "pm25": 64.0,
+      "pm10": 149.7,
+      "aqi": 160.0
+    },
+    {
+      "city": "Talcher",
+      "stations": 1,
+      "pm25": 63.9,
+      "pm10": 171.8,
+      "aqi": 178.0
+    },
+    {
+      "city": "Guwahati",
+      "stations": 1,
+      "pm25": 61.8,
+      "pm10": 113.9,
+      "aqi": 140.0
+    },
+    {
+      "city": "Kolkata",
+      "stations": 7,
+      "pm25": 58.8,
+      "pm10": 109.8,
+      "aqi": 133.0
+    }
+  ],
+  "stations": [
+    {
+      "id": "DL002",
+      "name": "Anand Vihar, Delhi - DPCC",
+      "city": "Delhi",
+      "mean": 154.8,
+      "max": 985.0,
+      "severe": 13320
+    },
+    {
+      "id": "UP016",
+      "name": "Talkatora District Industries Center, Lucknow - CPCB",
+      "city": "Lucknow",
+      "mean": 134.6,
+      "max": 1000.0,
+      "severe": 2395
+    },
+    {
+      "id": "DL008",
+      "name": "DTU, Delhi - CPCB",
+      "city": "Delhi",
+      "mean": 132.1,
+      "max": 1000.0,
+      "severe": 2965
+    },
+    {
+      "id": "BR007",
+      "name": "IGSC Planetarium Complex, Patna - BSPCB",
+      "city": "Patna",
+      "mean": 129.7,
+      "max": 994.0,
+      "severe": 3871
+    },
+    {
+      "id": "DL015",
+      "name": "Jahangirpuri, Delhi - DPCC",
+      "city": "Delhi",
+      "mean": 129.0,
+      "max": 1000.0,
+      "severe": 3102
+    },
+    {
+      "id": "DL038",
+      "name": "Wazirpur, Delhi - DPCC",
+      "city": "Delhi",
+      "mean": 128.6,
+      "max": 969.8,
+      "severe": 3577
+    },
+    {
+      "id": "DL020",
+      "name": "Mundka, Delhi - DPCC",
+      "city": "Delhi",
+      "mean": 123.9,
+      "max": 988.5,
+      "severe": 3205
+    },
+    {
+      "id": "DL032",
+      "name": "Rohini, Delhi - DPCC",
+      "city": "Delhi",
+      "mean": 123.6,
+      "max": 967.0,
+      "severe": 3157
+    },
+    {
+      "id": "DL005",
+      "name": "Bawana, Delhi - DPCC",
+      "city": "Delhi",
+      "mean": 121.8,
+      "max": 991.0,
+      "severe": 2412
+    },
+    {
+      "id": "DL006",
+      "name": "Burari Crossing, Delhi - IMD",
+      "city": "Delhi",
+      "mean": 121.8,
+      "max": 989.7,
+      "severe": 1432
+    }
+  ],
+  "heat": {
+    "2015": [
+      171.4,
+      143.1,
+      91.1,
+      75.3,
+      74.9,
+      63.5,
+      44.5,
+      47.8,
+      55.4,
+      93.1,
+      152.8,
+      143.4
+    ],
+    "2016": [
+      165.7,
+      115.0,
+      84.2,
+      83.4,
+      70.7,
+      71.4,
+      47.7,
+      40.1,
+      46.3,
+      108.5,
+      183.8,
+      167.6
+    ],
+    "2017": [
+      141.9,
+      113.5,
+      77.5,
+      85.7,
+      87.2,
+      54.2,
+      40.5,
+      33.1,
+      42.3,
+      105.8,
+      163.5,
+      141.3
+    ],
+    "2018": [
+      140.0,
+      110.6,
+      84.4,
+      73.8,
+      72.7,
+      66.0,
+      36.1,
+      36.4,
+      41.8,
+      103.1,
+      145.7,
+      165.4
+    ],
+    "2019": [
+      150.7,
+      96.3,
+      71.1,
+      67.3,
+      69.7,
+      47.9,
+      35.1,
+      27.5,
+      30.1,
+      79.8,
+      130.4,
+      129.1
+    ],
+    "2020": [
+      105.8,
+      85.2,
+      48.1,
+      35.5,
+      37.3,
+      32.0,
+      35.5,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hourly": [
+    95.3,
+    93.5,
+    91.4,
+    88.2,
+    85.8,
+    84.3,
+    84.1,
+    85.7,
+    89.6,
+    93.3,
+    92.3,
+    86.8,
+    79.1,
+    71.8,
+    65.7,
+    61.5,
+    58.8,
+    57.8,
+    59.5,
+    65.9,
+    76.3,
+    86.6,
+    93.0,
+    95.6
+  ],
+  "classes": [
+    {
+      "cls": "Good",
+      "readings": 529433,
+      "pm25": 17.8,
+      "pm10": 55.0,
+      "no2": 19.0,
+      "co": 0.92,
+      "ratio": 0.32
+    },
+    {
+      "cls": "Satisfactory",
+      "readings": 554211,
+      "pm25": 43.9,
+      "pm10": 114.1,
+      "no2": 29.5,
+      "co": 1.32,
+      "ratio": 0.39
+    },
+    {
+      "cls": "Moderate",
+      "readings": 322333,
+      "pm25": 73.7,
+      "pm10": 170.4,
+      "no2": 39.4,
+      "co": 1.56,
+      "ratio": 0.43
+    },
+    {
+      "cls": "Poor",
+      "readings": 164918,
+      "pm25": 103.9,
+      "pm10": 221.8,
+      "no2": 45.5,
+      "co": 2.0,
+      "ratio": 0.47
+    },
+    {
+      "cls": "Very Poor",
+      "readings": 272249,
+      "pm25": 169.4,
+      "pm10": 308.8,
+      "no2": 55.2,
+      "co": 2.52,
+      "ratio": 0.55
+    },
+    {
+      "cls": "Severe",
+      "readings": 98250,
+      "pm25": 368.7,
+      "pm10": 521.6,
+      "no2": 71.1,
+      "co": 3.13,
+      "ratio": 0.71
+    }
+  ]
+}

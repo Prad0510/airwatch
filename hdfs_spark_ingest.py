@@ -46,6 +46,12 @@ def parse_args():
         action="store_true",
         help="Run Spark in local mode (useful for local development without cluster)"
     )
+    parser.add_argument(
+        "--export-dashboard",
+        action="store_true",
+        default=True,
+        help="Export dashboard_data.json for AirWatch web UI upon completion"
+    )
     return parser.parse_args()
 
 def main():
@@ -78,6 +84,17 @@ def main():
         print("\n[SUCCESS] Pipeline completed successfully!")
         print(f"Total Records Ingested : {metrics['total_records']:,}")
         print(f"Execution Duration     : {metrics['execution_time_seconds']} seconds")
+
+        if args.export_dashboard:
+            try:
+                print("\n[Dashboard] Exporting updated metrics for AirWatch Dashboard...")
+                from export_dashboard_data import export_with_duckdb, export_with_pyspark
+                if args.local or not output_path.startswith("hdfs://"):
+                    export_with_duckdb(output_path, args.report, "dashboard_data.json")
+                else:
+                    export_with_pyspark(output_path, args.report, "dashboard_data.json")
+            except Exception as ex:
+                print(f"[Dashboard] Note: Could not export dashboard: {ex}")
     except Exception as e:
         print(f"\n[ERROR] Pipeline failed with error: {e}", file=sys.stderr)
         raise
