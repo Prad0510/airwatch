@@ -1,0 +1,28 @@
+# Data files & Archives
+data/
+*.csv
+*.csv.zip
+*.parquet
+*.json.gz
+
+# Python virtual environment & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+venv/
+env/
+ENV/
+
+# Spark / Hadoop runtime logs and metastore
+metastore_db/
+derby.log
+spark-warehouse/
+*.log
+
+# IDE and OS artifacts
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

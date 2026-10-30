@@ -1,0 +1,182 @@
+{
+  "metadata": {
+    "source_file": "data/station_hour.csv",
+    "file_size_bytes": 219675434,
+    "file_size_mb": 209.5,
+    "rows": 2589083,
+    "columns_count": 16,
+    "columns": [
+      "StationId",
+      "Datetime",
+      "PM2.5",
+      "PM10",
+      "NO",
+      "NO2",
+      "NOx",
+      "NH3",
+      "CO",
+      "SO2",
+      "O3",
+      "Benzene",
+      "Toluene",
+      "Xylene",
+      "AQI",
+      "AQI_Bucket"
+    ],
+    "in_memory_mb": 685.76,
+    "inspection_timestamp": "2026-10-30T13:18:01Z"
+  },
+  "dtypes": {
+    "StationId": "object",
+    "Datetime": "object",
+    "PM2.5": "float64",
+    "PM10": "float64",
+    "NO": "float64",
+    "NO2": "float64",
+    "NOx": "float64",
+    "NH3": "float64",
+    "CO": "float64",
+    "SO2": "float64",
+    "O3": "float64",
+    "Benzene": "float64",
+    "Toluene": "float64",
+    "Xylene": "float64",
+    "AQI": "float64",
+    "AQI_Bucket": "object"
+  },
+  "missing_values": {
+    "Xylene": {
+      "MissingCount": 2075104,
+      "MissingPercentage": 80.15
+    },
+    "NH3": {
+      "MissingCount": 1236618,
+      "MissingPercentage": 47.76
+    },
+    "PM10": {
+      "MissingCount": 1119252,
+      "MissingPercentage": 43.23
+    },
+    "Toluene": {
+      "MissingCount": 1042366,
+      "MissingPercentage": 40.26
+    },
+    "Benzene": {
+      "MissingCount": 861579,
+      "MissingPercentage": 33.28
+    },
+    "SO2": {
+      "MissingCount": 742737,
+      "MissingPercentage": 28.69
+    },
+    "O3": {
+      "MissingCount": 725973,
+      "MissingPercentage": 28.04
+    },
+    "PM2.5": {
+      "MissingCount": 647689,
+      "MissingPercentage": 25.02
+    },
+    "AQI": {
+      "MissingCount": 570190,
+      "MissingPercentage": 22.02
+    },
+    "AQI_Bucket": {
+      "MissingCount": 570190,
+      "MissingPercentage": 22.02
+    },
+    "NO": {
+      "MissingCount": 553711,
+      "MissingPercentage": 21.39
+    },
+    "NO2": {
+      "MissingCount": 528973,
+      "MissingPercentage": 20.43
+    },
+    "CO": {
+      "MissingCount": 499302,
+      "MissingPercentage": 19.28
+    },
+    "NOx": {
+      "MissingCount": 490808,
+      "MissingPercentage": 18.96
+    },
+    "StationId": {
+      "MissingCount": 0,
+      "MissingPercentage": 0.0
+    },
+    "Datetime": {
+      "MissingCount": 0,
+      "MissingPercentage": 0.0
+    }
+  },
+  "duplicates": {
+    "exact_duplicate_rows": 0,
+    "composite_key_duplicates_station_datetime": 0
+  },
+  "temporal_info": {
+    "min_datetime": "2015-01-01 01:00:00",
+    "max_datetime": "2020-07-01 00:00:00",
+    "unique_calendar_days": 2009
+  },
+  "station_info": {
+    "unique_stations_count": 110,
+    "sample_stations": [
+      "AP001",
+      "AP005",
+      "AS001",
+      "BR005",
+      "BR006",
+      "BR007",
+      "BR008",
+      "BR009",
+      "BR010",
+      "CH001"
+    ]
+  },
+  "aqi_bucket_distribution": {
+    "Moderate": 675008,
+    "NaN": 570190,
+    "Satisfactory": 530164,
+    "Very Poor": 301150,
+    "Poor": 239990,
+    "Good": 152113,
+    "Severe": 120468
+  },
+  "hdfs_storage_strategy": {
+    "file_format": {
+      "recommended": "Apache Parquet (Snappy compression)",
+      "alternative": "Apache ORC (ZSTD compression)",
+      "rationale": [
+        "Parquet uses columnar storage, drastically reducing I/O for analytical queries (e.g., querying only PM2.5 or AQI across stations).",
+        "Snappy provides balanced high decompression speed and ~75-80% compression ratio compared to raw CSV (~40-50MB vs 220MB).",
+        "Wide ecosystem compatibility with PySpark, Hive, Trino/Presto, Impala, and DuckDB."
+      ]
+    },
+    "partitioning_strategy": {
+      "recommended_partition_keys": [
+        "year",
+        "month"
+      ],
+      "avoid_partitioning_by": [
+        "hour",
+        "date",
+        "station_id"
+      ],
+      "rationale": [
+        "Total records (~2.59M) across ~5 years is medium-sized for Big Data systems.",
+        "Partitioning by (year, month) yields ~60-70 partition directories, each containing several megabytes of Parquet data, which avoids the HDFS 'Small Files Problem' that strains NameNode memory.",
+        "Partitioning by station_id (~110 stations) or daily/hourly would result in tens of thousands of tiny (<100KB) files, degrading HDFS Block allocation and MapReduce/Spark scheduling.",
+        "Queries typically analyze seasonal, monthly, or yearly trends, making (year, month) the ideal partition pruning granularity."
+      ]
+    },
+    "schema_optimization": {
+      "StationId": "StringType (or low-cardinality Dictionary)",
+      "Datetime": "TimestampType (UTC normalized)",
+      "Pollutants (PM2.5, PM10, NO, NO2, NOx, NH3, CO, SO2, O3, Benzene, Toluene, Xylene)": "FloatType (Float32 is sufficient, saving 50% vs DoubleType Float64)",
+      "AQI": "FloatType / IntegerType",
+      "AQI_Bucket": "StringType / Categorical"
+    },
+    "target_hdfs_path": "/data/air_quality/raw/station_hour/ (landing) and /data/air_quality/curated/station_hour/year=YYYY/month=MM/ (parquet)"
+  }
+}
