@@ -1,7 +1,7 @@
 {
   "sample": false,
   "live": true,
-  "generated_at": "2026-10-30T18:33:48.970791+00:00",
+  "generated_at": "2026-10-31T04:31:14.408528+00:00",
   "data_source": "Partitioned Parquet (Snappy)",
   "meta": {
     "rows": 2589083,
@@ -173,20 +173,20 @@
       "severe": 3157
     },
     {
-      "id": "DL005",
-      "name": "Bawana, Delhi - DPCC",
-      "city": "Delhi",
-      "mean": 121.8,
-      "max": 991.0,
-      "severe": 2412
-    },
-    {
       "id": "DL006",
       "name": "Burari Crossing, Delhi - IMD",
       "city": "Delhi",
       "mean": 121.8,
       "max": 989.7,
       "severe": 1432
+    },
+    {
+      "id": "DL005",
+      "name": "Bawana, Delhi - DPCC",
+      "city": "Delhi",
+      "mean": 121.8,
+      "max": 991.0,
+      "severe": 2412
     }
   ],
   "heat": {

@@ -97,10 +97,13 @@ python benchmark_optimization.py
 # 3. Execute all 4 Distributed Analytics Queries (City PM2.5, Top Stations, Monthly Trends, Pollutant Ratios)
 python run_analytics_local.py
 
-# 4. Launch Interactive Web Dashboard
+# 4. Run Automated Severe Exposure Alert Engine (>6 Consecutive Hours)
+python alert_service.py --min-hours 6
+
+# 5. Launch Interactive Web Dashboard
 python serve_dashboard.py
 
-# 5. Run Automated Unit & Pipeline Tests
+# 6. Run Automated Unit & Pipeline Tests
 python -m unittest discover tests/
 ```
 
@@ -130,6 +133,7 @@ airwatch/
 │   ├── config.py             # Schema definitions, column mappings, default HDFS & local paths
 │   ├── pipeline.py           # Core PySpark cleaning, CPCB classification & partition logic
 │   ├── quality_checks.py     # Anomaly detection, null rate calculation, duplicate audit
+│   ├── alerts.py             # Automated alerting engine (prolonged Severe streaks >6h)
 │   └── __init__.py           # Package exports
 ├── web/
 │   ├── index.html            # Standalone responsive AirWatch dashboard UI
@@ -143,9 +147,12 @@ airwatch/
 │   └── hive_queries.sql      # HiveQL analytical queries
 ├── tests/
 │   ├── test_pipeline.py      # Automated PySpark transformation unit tests
-│   └── test_dashboard.py     # Dashboard data schema & API server integration tests
+│   ├── test_dashboard.py     # Dashboard data schema & API server integration tests
+│   └── test_alerts.py        # Severe streak window logic & notification tests
 ├── serve_dashboard.py        # Live HTTP backend server with HDFS cluster status & API endpoints
 ├── export_dashboard_data.py  # DuckDB & Spark exporter producing dashboard_data.json
+├── alert_service.py          # CLI runner for CPCB Severe exposure alerting & notification dispatch
+├── alerts_log.json           # Audit log of detected prolonged Severe episodes
 ├── index.html                # Root entrypoint for web dashboard
 ├── dashboard_data.json       # Live aggregated analytics payload
 ├── inspect_dataset.py        # Dataset profiler (dimensions, dtypes, nulls, duplicates)
@@ -166,6 +173,7 @@ airwatch/
 ## 🌐 Web Dashboards & Endpoints
 - **AirWatch Interactive UI**: [http://localhost:8050](http://localhost:8050)
   - Live Data API: [http://localhost:8050/api/dashboard-data](http://localhost:8050/api/dashboard-data)
+  - Severe Alerts API: [http://localhost:8050/api/alerts](http://localhost:8050/api/alerts)
   - HDFS Cluster Health: [http://localhost:8050/api/hdfs-status](http://localhost:8050/api/hdfs-status)
   - Live Performance Benchmark: [http://localhost:8050/api/benchmark](http://localhost:8050/api/benchmark)
 - **HDFS NameNode UI**: [http://localhost:9870](http://localhost:9870)

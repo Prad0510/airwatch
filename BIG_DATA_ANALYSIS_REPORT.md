@@ -140,14 +140,200 @@ AirWatch supports four distinct big data query engines over the same curated dat
    - Defines enterprise data catalog tables (`raw_station_hour`, `stations`, `curated_station_hour`).
    - Uses `MSCK REPAIR TABLE` to automatically discover partitioned directories.
 4. **Hadoop Streaming MapReduce** (`mapreduce/mapper.py`, `mapreduce/reducer.py`):
-   - Demonstrates foundational distributed MapReduce:
-     - **Mapper**: Emits `StationId \t PM2.5 \t 1`.
-     - **Shuffle & Sort**: Hadoop framework groups records by `StationId`.
-     - **Reducer**: Aggregates running sum, count, min, and max PM2.5 per station in streaming $O(1)$ memory.
+   - Pure distributed Map-Shuffle-Sort-Reduce pipeline processing raw CSV input streams across HDFS blocks.
 
 ---
 
-## 5. In-Depth Analytical Features & Empirical Findings
+## 5. Detailed Working of Hadoop MapReduce & Partitioned Parquet
+
+### 5.1 Deep-Dive: Working of Hadoop Streaming MapReduce
+
+The MapReduce implementation in AirWatch (`mapreduce/mapper.py` and `mapreduce/reducer.py`) computes per-station baseline statistics (total readings, mean $PM_{2.5}$, minimum $PM_{2.5}$, and maximum $PM_{2.5}$) without loading the dataset into memory:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                   HDFS Raw CSV (209.5 MB, 2.59M Rows)                  │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ InputSplits (128 MB HDFS Blocks)
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ MAP PHASE (mapper.py)                                                  │
+│ • Reads line-by-line via sys.stdin                                     │
+│ • Tokenizes CSV: parts = line.split(',')                               │
+│ • Filters header row & negative sensor anomalies (< 0)                 │
+│ • Emits Key-Value tuples: StationId \t PM2.5 \t 1                      │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Map Output Stream
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ SHUFFLE & SORT PHASE (Hadoop Core Framework)                           │
+│ • Hash Partitioner: assigns key to Reducer: hash(StationId) % N        │
+│ • In-Memory Buffer Sorting: quicksorts keys within sort buffer         │
+│ • Spill Files & Network Transfer (Shuffle): merges sorted runs         │
+│ • Guarantee: All records for identical StationId arrive contiguous     │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Partitioned & Sorted Key Stream
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ REDUCE PHASE (reducer.py)                                              │
+│ • Streaming State Machine: tracks current_station in O(1) memory       │
+│ • Running Accumulation: sum_pm25 += val, count++, min/max updates      │
+│ • Key Change Transition: emits StationId \t Count \t Mean \t Min \t Max│
+│ • Final Flush upon EOF                                                 │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Detailed Phase Mechanics:
+
+1. **InputSplit & RecordReader**:
+   - The HDFS NameNode slices `station_hour.csv` into physical 128 MB blocks.
+   - `LineRecordReader` streams individual text lines through Unix standard input (`sys.stdin`) into child mapper processes.
+   - Cross-block line handling: If a line crosses a 128 MB block boundary, the record reader automatically reads into the next block across the cluster network to complete the row.
+
+2. **Map Phase (`mapper.py`)**:
+   - **Signature**: $(K_1, V_1) \to \text{list}(K_2, V_2)$ where $K_1 = \text{byte offset}$, $V_1 = \text{raw CSV line}$, $K_2 = \text{StationId}$, $V_2 = (PM_{2.5}, 1)$.
+   - Validates that $PM_{2.5}$ is a valid positive float ($PM_{2.5} \ge 0$).
+   - Emits intermediate key-values:
+     ```
+     AP001    77.9    1
+     AP001    84.2    1
+     DL002    154.8   1
+     ```
+
+3. **Shuffle & Sort Phase (Distributed Coordination)**:
+   - **Partitioner**: Evaluates `hash(StationId) % num_reducers` to route all occurrences of a station to the exact same Reducer node.
+   - **Sort Buffer**: Mappers write to an in-memory ring buffer (default 100 MB). When 80% full, an in-memory quicksort sorts by `StationId`, and spills to disk.
+   - **External Merge Sort**: On the reducer node, the framework performs a multi-way merge sort so the input to `reducer.py` is guaranteed to be strictly ordered by `StationId`.
+
+4. **Reduce Phase (`reducer.py`)**:
+   - **Memory Invariant**: Memory complexity is **strictly $O(1)$**. The reducer never buffers all records for a station into a list.
+   - **Streaming Aggregation**:
+     $$\text{sum\_pm25} = \sum_{i=1}^{n} x_i, \quad \text{count} = n, \quad \text{min} = \min(x_i), \quad \text{max} = \max(x_i)$$
+   - **Transition**: When a new `StationId` appears, the reducer calculates $\text{mean} = \frac{\text{sum\_pm25}}{\text{count}}$ and emits the final result to HDFS:
+     ```
+     StationId    TotalReadings    MeanPM2.5    MinPM2.5    MaxPM2.5
+     AP001        19324            77.97        0.1         999.0
+     DL002        22410            154.80       1.2         985.0
+     ```
+
+---
+
+### 5.2 Deep-Dive: Working of Partitioned Apache Parquet
+
+Apache Parquet is an open-source, columnar storage file format optimized for fast analytical queries. In AirWatch, the data is partitioned as:
+
+$$\text{Root} \to \text{year}=YYYY \to \text{month}=MM \to \text{part-*.parquet}$$
+
+```
+Parquet Physical File Internal Structure:
+
+┌─────────────────────────────────────────────────────────────┐
+│ Header: 'PAR1' (4-byte Magic Number)                        │
+├─────────────────────────────────────────────────────────────┤
+│ ROW GROUP 0 (~128 MB or 500k rows)                          │
+│  ├─ Column Chunk 1: StationId (Dictionary + Bit-Packed)     │
+│  │   ├─ Dictionary Page: ["AP001", "DL002", "UP016", ...]   │
+│  │   └─ Data Pages: [0, 0, 0, 1, 1, 2, ...]                 │
+│  ├─ Column Chunk 2: Datetime  (64-bit Timestamp Page)       │
+│  ├─ Column Chunk 3: PM2_5     (32-bit Float + Snappy Page)  │
+│  ├─ Column Chunk 4: PM10      (32-bit Float + Snappy Page)  │
+│  └─ Column Chunk 5..16 (NO, NO2, CO, SO2, AQI, ...)         │
+├─────────────────────────────────────────────────────────────┤
+│ ROW GROUP 1 ...                                             │
+├─────────────────────────────────────────────────────────────┤
+│ FILE FOOTER (Read First by Query Engine)                    │
+│  ├─ File Metadata & Schema Definition                       │
+│  ├─ Row Group Metadata & Byte Offsets                       │
+│  └─ Column Chunk Statistics:                                │
+│      • PM2_5: [min=0.0, max=985.0, null_count=1240]         │
+│      • AQI:   [min=12.0, max=500.0, null_count=980]         │
+├─────────────────────────────────────────────────────────────┤
+│ 4-byte Footer Length + 'PAR1' Magic Number                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Why Partitioned Parquet Achieves a 25.6× Speedup:
+
+1. **Partition Pruning (Directory Pushdown)**:
+   - When a query contains `WHERE year = 2020`, query engines (Spark SQL, DuckDB, Hive) evaluate directory names before opening files.
+   - Directories matching `year=2015/` through `year=2019/` (60 out of 67 partition directories) are **completely skipped**. Zero bytes are transferred or read for 89.5% of the dataset.
+
+2. **Column Projection (Vertical Partitioning)**:
+   - In CSV, every row must be parsed sequentially from left to right. To read $PM_{2.5}$ and AQI, the computer must parse all other 14 columns.
+   - In Parquet, the engine seeks directly to the byte offsets of the `PM2_5` and `AQI` column chunks specified in the Footer. The other 14 column chunks are never touched.
+
+3. **Page-Level Statistics & Row-Group Skipping**:
+   - The Parquet Footer stores `[min_value, max_value]` for each column chunk.
+   - When searching for severe pollution ($PM_{2.5} > 250$), any Row Group whose footer stats report $\text{max}(PM_{2.5}) < 250$ is instantly bypassed without decompression.
+
+4. **Dictionary Encoding & Snappy Compression**:
+   - **Dictionary Encoding**: Repeated strings like `City = "Delhi"` or `AQI_Bucket = "Severe"` are replaced with 1-byte integer tokens, reducing memory by ~75%.
+   - **Snappy Compression**: High-throughput block compressor decompressing at $>250\text{ MB/s}$ per CPU core with low CPU latency.
+
+---
+
+## 6. Automated Severe Exposure Alerting Engine (>6 Consecutive Hours)
+
+### 6.1 Environmental Threat & Problem Formulation
+Prolonged human exposure to air categorized as **CPCB Severe** ($PM_{2.5} > 250\ \mu\text{g/m}^3$ or $\text{AQI} > 400$) causes acute pulmonary stress, severe asthma exacerbations, and cardiovascular crises. While episodic 1-hour spikes can occur due to local dust or sensor noise, continuous exposure lasting **$> 6$ consecutive hours** represents an acute public health emergency requiring immediate public advisories and industrial curtailment.
+
+### 6.2 Consecutive Streak Detection Algorithm (`src/alerts.py`)
+To detect multi-hour severe streaks across 2.59 million rows without memory limits, AirWatch implements an optimized SQL window grouping algorithm:
+
+```sql
+WITH flagged AS (
+    SELECT 
+        year, StationId, StationName, City, Datetime, PM2_5, AQI,
+        CASE WHEN (PM2_5 > 250.0 OR AQI_Bucket = 'Severe') THEN 1 ELSE 0 END AS is_severe,
+        LAG(Datetime) OVER (PARTITION BY StationId ORDER BY Datetime) AS prev_dt,
+        LAG(is_severe) OVER (PARTITION BY StationId ORDER BY Datetime) AS prev_severe
+    FROM aq
+),
+continuous_blocks AS (
+    SELECT *,
+        CASE 
+            WHEN is_severe = 1 AND (prev_severe = 0 OR prev_severe IS NULL OR epoch(Datetime) - epoch(prev_dt) > 3600) THEN 1 
+            ELSE 0 
+        END AS is_new_streak
+    FROM flagged
+    WHERE is_severe = 1
+),
+grouped AS (
+    SELECT *,
+        SUM(is_new_streak) OVER (PARTITION BY StationId ORDER BY Datetime) AS streak_group
+    FROM continuous_blocks
+)
+SELECT 
+    StationId, FIRST(StationName) AS StationName, FIRST(City) AS City,
+    MIN(Datetime) AS streak_start, MAX(Datetime) AS streak_end,
+    COUNT(*) AS consecutive_hours,
+    ROUND(AVG(PM2_5), 1) AS avg_pm25,
+    ROUND(MAX(PM2_5), 1) AS peak_pm25
+FROM grouped
+GROUP BY StationId, streak_group
+HAVING COUNT(*) >= 6
+ORDER BY streak_end DESC, consecutive_hours DESC;
+```
+
+#### Alert Severity Matrix:
+| Consecutive Hours | Alert Level | Actionable Advisory |
+| :---: | :---: | :--- |
+| **6 to 11 Hours** | `WARNING` | Vulnerable groups (children, elderly, respiratory patients) remain indoors. |
+| **12 to 23 Hours** | `CRITICAL` | General public must avoid outdoor exertion; air purifiers recommended. |
+| **$\ge$ 24 Hours** | `EMERGENCY` | Full industrial & construction shutdown; traffic restrictions triggered. |
+
+### 6.3 Multi-Channel Notification Dispatchers
+1. **Slack / Generic Webhooks** (`send_slack_webhook`):
+   - Formats structured Slack Block Kit payloads with colored status indicators (Warning: `#EF8A2A`, Critical: `#D9482F`, Emergency: `#8E1B2E`).
+   - Dispatches via HTTP POST to `AIRWATCH_WEBHOOK_URL`.
+2. **Email Alerts (SMTP)** (`send_email_alert`):
+   - Generates dual MIME-encoded HTML and plaintext emails with station details, duration, peak values, and health warnings.
+3. **Audit Logging** (`save_alerts_audit_log`):
+   - Persists all detected historical incidents to `alerts_log.json` for compliance auditing.
+
+---
+
+## 7. In-Depth Analytical Features & Empirical Findings
 
 ### Feature 1: Spatial Pollution Disparity (City-Level Rankings)
 

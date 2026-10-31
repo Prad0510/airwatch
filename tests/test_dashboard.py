@@ -137,6 +137,22 @@ class TestDashboardServer(unittest.TestCase):
         self.assertIn("speedup_vs_csv", bench)
         self.assertIn("execution_time_seconds", bench)
 
+    def test_get_alerts_api(self):
+        url = f"http://localhost:{self.port}/api/alerts"
+        req = urllib.request.urlopen(url)
+        self.assertEqual(req.status, 200)
+        alerts_data = json.loads(req.read().decode("utf-8"))
+        self.assertIn("incidents", alerts_data)
+
+    def test_post_alerts_test_api(self):
+        url = f"http://localhost:{self.port}/api/alerts/test"
+        req = urllib.request.Request(url, data=b"", method="POST")
+        res = urllib.request.urlopen(req)
+        self.assertEqual(res.status, 200)
+        res_data = json.loads(res.read().decode("utf-8"))
+        self.assertEqual(res_data["status"], "success")
+        self.assertIn("dispatch", res_data)
+
 if __name__ == "__main__":
     unittest.main()
 

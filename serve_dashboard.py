@@ -27,6 +27,12 @@ import argparse
 from datetime import datetime, timezone
 
 from export_dashboard_data import export_with_duckdb
+from src.alerts import (
+    detect_severe_streaks,
+    send_slack_webhook,
+    send_email_alert,
+    save_alerts_audit_log
+)
 
 DEFAULT_PORT = 8050
 PARQUET_PATH = "data/station_hour_parquet"
@@ -129,6 +135,21 @@ class AirWatchDashboardHandler(SimpleHTTPRequestHandler):
             self.send_json_response(status)
             return
 
+        # Route: Alerts API
+        if self.path.startswith("/api/alerts"):
+            alerts_file = "alerts_log.json"
+            if os.path.exists(alerts_file):
+                with open(alerts_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            else:
+                incidents = detect_severe_streaks(PARQUET_PATH, min_consecutive_hours=6, recent_only=True)
+                data = {
+                    "total_incidents": len(incidents),
+                    "incidents": incidents
+                }
+            self.send_json_response(data)
+            return
+
         # Route: Quick Live Benchmark (Scan 2020 filter)
         if self.path.startswith("/api/benchmark"):
             bench = self.run_quick_benchmark()
@@ -150,6 +171,34 @@ class AirWatchDashboardHandler(SimpleHTTPRequestHandler):
                 self.send_json_response(data)
             except Exception as e:
                 self.send_error_response(500, f"Refresh failed: {str(e)}")
+            return
+
+        # Route: Test alert trigger
+        if self.path.startswith("/api/alerts/test"):
+            sample = {
+                "incident_id": f"TEST-{int(time.time())}",
+                "station_id": "DL002",
+                "station_name": "Anand Vihar, Delhi - DPCC",
+                "city": "Delhi",
+                "streak_start": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:00:00"),
+                "streak_end": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:00:00"),
+                "consecutive_hours": 7,
+                "level": "WARNING",
+                "avg_pm25": 315.4,
+                "peak_pm25": 440.0,
+                "peak_aqi": 475.0,
+                "message": "CPCB Severe Alert Test: 7 consecutive hours exceeding Severe threshold."
+            }
+            res_slack = send_slack_webhook(sample)
+            res_email = send_email_alert(sample)
+            self.send_json_response({
+                "status": "success",
+                "alert": sample,
+                "dispatch": {
+                    "slack_webhook": res_slack,
+                    "email": res_email
+                }
+            })
             return
 
         self.send_error(404, "Unknown POST route")
